@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import v1Routes from './routes/v1';
 import { ApiError } from './utils/ApiError';
 import { ApiResponse } from './utils/ApiResponse';
+import { errorConverter, errorHandler } from './middleware/error';
 
 const createApp = (): Express => {
     const app: Express = express();
@@ -24,16 +25,16 @@ const createApp = (): Express => {
     app.use(express.urlencoded({ extended: true }));
 
     // Rate limiting
-    const limiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100 // limit each IP to 100 requests per windowMs
-    });
-    app.use(limiter);
+    // const limiter = rateLimit({
+    //     windowMs: 15 * 60 * 1000, // 15 minutes
+    //     max: 100 // limit each IP to 100 requests per windowMs
+    // });
+    // app.use(limiter);
 
     // Logging
     if (environment === 'production') {
         app.use(morgan('combined'));
-    } else {
+    } else if (environment !== 'test') {
         app.use(morgan('dev'));
     }
 
@@ -67,22 +68,16 @@ const createApp = (): Express => {
         });
     });
 
-    // Error handling middleware
-    app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-        console.error(err.stack);
-        
-        const statusCode = err instanceof ApiError ? err.statusCode : 500;
-        const message = err instanceof ApiError ? err.message : 'Internal Server Error';
-        const errorMessage = environment === 'development' 
-            ? `${message}\n${err.stack}`
-            : message;
-        
-        return ApiResponse.error(
-            res,
-            errorMessage,
-            statusCode
-        );
+    // Handle 404
+    app.use((req, res, next) => {
+        next(new ApiError(404, 'Not found'));
     });
+
+    // Convert error to ApiError, if needed
+    app.use(errorConverter);
+
+    // Handle error
+    app.use(errorHandler);
 
     return app;
 };

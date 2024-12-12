@@ -2,68 +2,96 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../utils/ApiError';
 import httpStatus from 'http-status';
+import { UserRole, isValidRole } from '../interfaces/role.interface';
+import { extractTokenFromHeader } from '../utils/token';
 
-// No need to load dotenv here since it's already loaded in index.ts
+interface JwtPayload {
+    _id: string;
+    email: string;
+    role: UserRole;
+    iat?: number;
+    exp?: number;
+}
 
 declare global {
     namespace Express {
         interface Request {
-            user?: {
-                id: string;
-                email: string;
-                role?: string;
-            };
+            user?: JwtPayload;
         }
     }
 }
 
 export const auth = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const authHeader = req.headers.authorization;
+        // Extract token using utility function
+        const token = extractTokenFromHeader(req);
 
-        if (!authHeader?.startsWith('Bearer ')) {
-            throw new ApiError(httpStatus.UNAUTHORIZED, 'No token provided');
-        }
+        const accessSecret = process.env.JWT_ACCESS_SECRET || 'my_secret';
 
-        const token = authHeader.split(' ')[1];
-
-        if (!token) {
-            throw new ApiError(httpStatus.UNAUTHORIZED, 'No token provided');
-        }
+        console.log("Access Secret", accessSecret);
+        
 
         try {
-            const decoded = jwt.verify(token, 'secret') as unknown as {
-                id: string;
-                email: string;
-                role?: string;
+            const decoded = jwt.verify(token, accessSecret) as JwtPayload;
+            
+            // Verify token hasn't expired
+            if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Token has expired');
+            }
+
+            // Validate required fields
+            if (!decoded._id || !decoded.email) {
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token payload');
+            }
+
+            // Validate role
+            if (!decoded.role || !isValidRole(decoded.role)) {
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid user role');
+            }
+
+            req.user = {
+                _id: decoded._id,
+                email: decoded.email,
+                role: decoded.role,
+                iat: decoded.iat,
+                exp: decoded.exp
             };
 
-            req.user = decoded;
             next();
         } catch (error) {
+            console.error('Token verification error:', error);
+            
             if (error instanceof jwt.TokenExpiredError) {
-                throw new ApiError(httpStatus.UNAUTHORIZED, 'Token expired');
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Token has expired');
+            } else if (error instanceof jwt.JsonWebTokenError) {
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token');
+            } else if (error instanceof ApiError) {
+                throw error;
             }
-            throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token');
+            throw new ApiError(httpStatus.UNAUTHORIZED, 'Authentication failed');
         }
     } catch (error) {
         next(error);
     }
 };
 
-export const requireRole = (roles: string[]) => {
+export const requireRole = (roles: UserRole[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
-        if (!req.user) {
-            throw new ApiError(httpStatus.UNAUTHORIZED, 'User not authenticated');
-        }
+        try {
+            if (!req.user) {
+                throw new ApiError(httpStatus.UNAUTHORIZED, 'Authentication required');
+            }
 
-        if (!req.user.role || !roles.includes(req.user.role)) {
-            throw new ApiError(
-                httpStatus.FORBIDDEN,
-                'You do not have permission to perform this action'
-            );
-        }
+            if (!roles.includes(req.user.role)) {
+                throw new ApiError(
+                    httpStatus.FORBIDDEN,
+                    'You do not have permission to perform this action'
+                );
+            }
 
-        next();
+            next();
+        } catch (error) {
+            next(error);
+        }
     };
 };

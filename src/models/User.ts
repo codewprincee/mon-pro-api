@@ -1,16 +1,17 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcrypt';
+import { UserRole } from '../interfaces/role.interface';
 
 export interface IUser extends Document {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
+  role: UserRole;
   tokenVersion: number;
   isActive: boolean;
   lastLoginAt?: Date;
   trialEndsAt: Date;
-  role: string;
   activeSession?: {
     token: string;
     deviceId: string;
@@ -45,6 +46,12 @@ const userSchema = new Schema<IUser>({
     required: [true, 'Last name is required'],
     trim: true,
   },
+  role: {
+    type: String,
+    enum: Object.values(UserRole),
+    default: UserRole.USER,
+    required: true,
+  },
   tokenVersion: {
     type: Number,
     default: 0,
@@ -59,11 +66,6 @@ const userSchema = new Schema<IUser>({
   trialEndsAt: {
     type: Date,
     required: true,
-  },
-  role: {
-    type: String,
-    enum: ['user', 'admin', 'manager'],
-    default: 'user',
   },
   activeSession: {
     token: String,
