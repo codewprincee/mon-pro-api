@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
+    "moduleResolution": "node",
     "lib": ["es6", "dom"],
     "allowJs": true,
     "outDir": "dist",
@@ -13,4 +14,4 @@
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
-} 
+}

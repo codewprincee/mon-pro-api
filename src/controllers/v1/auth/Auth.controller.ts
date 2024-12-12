@@ -4,8 +4,9 @@ import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import { ApiError } from '../../../utils/ApiError';
 import { ApiResponse } from '../../../utils/ApiResponse';
-import { User } from '../../../models/User.model';
+
 import { Auth, AuthResponse, TokenPayload, RefreshTokenPayload } from '../../../interfaces/auth.interface';
+import { User } from '../../../models/User';
 
 export class AuthController {
     private static ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'access_secret';
