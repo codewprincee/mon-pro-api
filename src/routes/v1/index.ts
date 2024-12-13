@@ -4,6 +4,7 @@ import authRoutes from './auth/auth.routes';
 import userRoutes from './user/user.route';
 import planRoutes from './plans/plan.routes';
 import seedRoutes from './seed.route';
+import monitorRoute from './monitor/monitor.route';
 
 
 const router = Router();
@@ -18,5 +19,6 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', seedRoutes);
 router.use('/plans', planRoutes);
+router.use('/monitor', monitorRoute)
 
 export default router;

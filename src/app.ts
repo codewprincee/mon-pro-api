@@ -10,6 +10,7 @@ import { ApiError } from './utils/ApiError';
 import { ApiResponse } from './utils/ApiResponse';
 import { errorConverter, errorHandler } from './middleware/error';
 import { swaggerSpec } from './config/swagger';
+import basicAuth from 'express-basic-auth';
 
 const createApp = (): Express => {
     const app: Express = express();
@@ -70,16 +71,22 @@ const createApp = (): Express => {
         });
     });
 
-    // Swagger documentation
+    // Swagger documentation with password protection
     if (environment === 'development') {
-        app.use('/docs', swaggerUi.serve);
+        app.use('/docs', basicAuth({
+            users: { 'admin': 'password' },
+            challenge: true,
+        }), swaggerUi.serve);
         app.get('/docs', swaggerUi.setup(swaggerSpec, {
             explorer: true,
             customCss: '.swagger-ui .topbar { display: none }',
         }));
 
-        // Endpoint to get swagger.json
-        app.get('/swagger.json', (req, res) => {
+        // Endpoint to get swagger.json (also protected)
+        app.get('/swagger.json', basicAuth({
+            users: { 'admin': 'password' },
+            challenge: true,
+        }), (req, res) => {
             res.setHeader('Content-Type', 'application/json');
             res.send(swaggerSpec);
         });
