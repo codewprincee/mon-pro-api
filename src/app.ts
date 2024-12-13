@@ -4,10 +4,12 @@ import cors from 'cors';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import v1Routes from './routes/v1';
 import { ApiError } from './utils/ApiError';
 import { ApiResponse } from './utils/ApiResponse';
 import { errorConverter, errorHandler } from './middleware/error';
+import { swaggerSpec } from './config/swagger';
 
 const createApp = (): Express => {
     const app: Express = express();
@@ -67,6 +69,21 @@ const createApp = (): Express => {
             documentation: '/api'
         });
     });
+
+    // Swagger documentation
+    if (environment === 'development') {
+        app.use('/docs', swaggerUi.serve);
+        app.get('/docs', swaggerUi.setup(swaggerSpec, {
+            explorer: true,
+            customCss: '.swagger-ui .topbar { display: none }',
+        }));
+
+        // Endpoint to get swagger.json
+        app.get('/swagger.json', (req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.send(swaggerSpec);
+        });
+    }
 
     // Handle 404
     app.use((req, res, next) => {

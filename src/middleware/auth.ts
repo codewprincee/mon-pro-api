@@ -9,6 +9,8 @@ interface JwtPayload {
     _id: string;
     email: string;
     role: UserRole;
+    planId: string;
+    id: string;
     iat?: number;
     exp?: number;
 }
@@ -53,6 +55,8 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
                 _id: decoded._id,
                 email: decoded.email,
                 role: decoded.role,
+                planId: decoded._id, // Using _id as planId for now
+                id: decoded._id,    // Using _id as id for now
                 iat: decoded.iat,
                 exp: decoded.exp
             };

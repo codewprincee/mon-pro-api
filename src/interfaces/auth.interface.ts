@@ -14,11 +14,11 @@ export interface AuthResponse {
 }
 
 export interface TokenPayload {
-    planId: any;
-    id(id: any, featureName: string): unknown;
     _id: string;
     email: string;
     role: UserRole;
+    planId: string;
+    id: string;
 }
 
 export interface RefreshTokenPayload extends TokenPayload {

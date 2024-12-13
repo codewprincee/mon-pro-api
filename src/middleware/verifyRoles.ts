@@ -1,12 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../interfaces/auth.interface';
 import { ApiError } from '../utils/ApiError';
+import { UserRole } from '../interfaces/role.interface';
 
-export enum UserRole {
-    USER = 'user',
-    ADMIN = 'admin',
-    PREMIUM = 'premium'
-}
+export { UserRole };
 
 export const verifyRoles = (...allowedRoles: UserRole[]) => {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -14,7 +11,7 @@ export const verifyRoles = (...allowedRoles: UserRole[]) => {
             throw new ApiError(401, "No role specified");
         }
 
-        const userRole = req.user.role as string;
+        const userRole = req.user.role;
         const hasRequiredRole = allowedRoles.some(role => role === userRole);
 
         if (!hasRequiredRole) {

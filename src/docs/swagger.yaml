@@ -1,0 +1,397 @@
+openapi: 3.0.0
+info:
+  title: Monitro API Documentation
+  version: 1.0.0
+  description: API documentation for Monitro SaaS platform
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: API Support
+    url: https://montpro.com/support
+    email: support@montpro.com
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local Development Server
+  - url: https://api.montpro.com
+    description: Production Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: User's password (min 8 characters)
+        firstName:
+          type: string
+          description: User's first name
+        lastName:
+          type: string
+          description: User's last name
+    
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          format: password
+          description: User's password
+    
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the operation was successful
+        message:
+          type: string
+          description: Response message
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              description: JWT access token
+            refreshToken:
+              type: string
+              description: JWT refresh token
+            user:
+              type: object
+              properties:
+                _id:
+                  type: string
+                  description: User's unique identifier
+                email:
+                  type: string
+                  description: User's email
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                role:
+                  type: string
+                  enum: [user, admin, premium]
+                  description: User's role
+
+    PlanFeature:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          description: Name of the feature
+        description:
+          type: string
+          description: Description of the feature
+        limit:
+          type: number
+          description: Usage limit for the feature (null for unlimited)
+        isUnlimited:
+          type: boolean
+          description: Whether the feature has unlimited usage
+
+    Plan:
+      type: object
+      required:
+        - name
+        - description
+        - price
+        - billingCycle
+      properties:
+        name:
+          type: string
+          description: Name of the plan
+        description:
+          type: string
+          description: Description of the plan
+        price:
+          type: number
+          description: Price of the plan
+        billingCycle:
+          type: string
+          enum: [monthly, yearly]
+          description: Billing cycle of the plan
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanFeature'
+          description: List of features included in the plan
+        isActive:
+          type: boolean
+          description: Whether the plan is currently active
+
+paths:
+  /v1/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input data
+        '409':
+          description: Email already exists
+
+  /v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid credentials
+        '401':
+          description: Authentication failed
+
+  /v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Not authenticated
+
+  /v1/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  description: Valid refresh token
+      responses:
+        '200':
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+        '401':
+          description: Invalid refresh token
+        '403':
+          description: Refresh token expired or invalid
+
+  /v1/plans:
+    get:
+      tags:
+        - Plans
+      summary: Get all available plans
+      responses:
+        '200':
+          description: List of all plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Plan'
+        '500':
+          description: Server error
+    
+    post:
+      tags:
+        - Plans
+      summary: Create a new plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Plan'
+      responses:
+        '201':
+          description: Plan created successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /v1/plans/usage:
+    get:
+      tags:
+        - Plans
+      summary: Get user's feature usage
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User's feature usage statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      features:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            featureName:
+                              type: string
+                            currentUsage:
+                              type: number
+                            limit:
+                              type: number
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /v1/plans/usage/increment:
+    post:
+      tags:
+        - Plans
+      summary: Increment feature usage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - featureName
+              properties:
+                featureName:
+                  type: string
+                increment:
+                  type: number
+                  default: 1
+      responses:
+        '200':
+          description: Usage incremented successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden or usage limit exceeded
+
+  /v1/plans/{id}:
+    put:
+      tags:
+        - Plans
+      summary: Update a plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Plan ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Plan'
+      responses:
+        '200':
+          description: Plan updated successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Plan not found
