@@ -47,14 +47,50 @@ const getMe = asyncHandler(async (req: AuthenticatedRequest, res: Response<UserR
                 trialEndsAt: user.trialEndsAt
             }
         }
+
     });
 });
 
 const deleteAccount = asyncHandler(async (req: AuthenticatedRequest, res: Response<UserResponse>) => {
-    const { _id } = req.user;
-    await User.findByIdAndDelete(_id);
+    if (!req.user) {
+        return ApiResponse.error(res, 'Unauthorized', 401);
+    }
 
-    return ApiResponse.success(res, 'Account deleted successfully');
+    const { _id } = req.user;
+
+    const deletedUser = await User.findByIdAndDelete(_id);
+    if (!deletedUser) {
+        return ApiResponse.error(res, 'User not found', 404);
+    }
+
+    return ApiResponse.success(res, 'Account deleted successfully', null);
+});
+
+const updateUser = asyncHandler(async (req: AuthenticatedRequest, res: Response<UserResponse>) => {
+    if (!req.user) {
+        return ApiResponse.error(res, 'Unauthorized', 401);
+    }
+
+    const { _id } = req.user;
+
+    // Ensure req.body is a valid update object
+    if (!req.body || typeof req.body !== 'object') {
+        return ApiResponse.error(res, 'Invalid update data', 400);
+    }
+
+    const updateData: Partial<IUser> = req.body as Partial<IUser>;
+
+    const updatedUser = await User.findByIdAndUpdate(
+        _id,
+        updateData,
+        { new: true }
+    ).select('-password -tokenVersion');
+
+    if (!updatedUser) {
+        return ApiResponse.error(res, 'User not found', 404);
+    }
+
+    return ApiResponse.success(res, 'User updated successfully', updatedUser);
 });
 
 export { getMe, deleteAccount };

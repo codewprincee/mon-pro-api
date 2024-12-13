@@ -17,24 +17,20 @@ export class AuthController {
     private static SALT_ROUNDS = 10;
 
     private validateJwtSecrets() {
-        if (!AuthController.ACCESS_TOKEN_SECRET) {
-            throw new ApiError(500, 'JWT access secret not configured');
-        }
-        if (!AuthController.REFRESH_TOKEN_SECRET) {
-            throw new ApiError(500, 'JWT refresh secret not configured');
+        if (!AuthController.ACCESS_TOKEN_SECRET || !AuthController.REFRESH_TOKEN_SECRET) {
+            throw new ApiError(500, 'JWT secrets not configured');
         }
     }
 
     private createTokens(user: any): { accessToken: string; refreshToken: string } {
         this.validateJwtSecrets();
-        console.log("MY Access", AuthController.ACCESS_TOKEN_SECRET);
-        console.log("MY Refresh", AuthController.REFRESH_TOKEN_SECRET);
-        
-        
+
         const tokenPayload: TokenPayload = {
-            _id: user._id.toString(), // Ensure _id is a string
+            _id: user._id.toString(),
             email: user.email,
-            role: user.role || UserRole.USER
+            role: user.role || UserRole.USER,
+            planId: user.planId,
+            id: user._id.toString()
         };
 
         const refreshPayload: RefreshTokenPayload = {
@@ -63,30 +59,17 @@ export class AuthController {
     public register = asyncHandler(async (req: Request, res: Response) => {
         const { email, password, firstName, lastName } = req.body;
 
-        // Check if all required fields are present
-        if (!email) {
-            throw new ApiError(400, 'Email is required');
-        }
-        if (!password) {
-            throw new ApiError(400, 'Password is required');
-        }
-        if (!firstName) {
-            throw new ApiError(400, 'First name is required');
-        }
-        if (!lastName) {
-            throw new ApiError(400, 'Last name is required');
+        if (!email || !password || !firstName || !lastName) {
+            throw new ApiError(400, 'All fields are required');
         }
 
-        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             throw new ApiError(409, 'Email already registered');
         }
 
-        // Hash password
         const hashedPassword = await hash(password, AuthController.SALT_ROUNDS);
 
-        // Create user with default role
         const user = await User.create({
             email,
             password: hashedPassword,
@@ -94,14 +77,12 @@ export class AuthController {
             lastName,
             role: UserRole.USER,
             tokenVersion: 0,
-            trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days trial
+            trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
         });
 
         const { accessToken, refreshToken } = this.createTokens(user);
 
-        // Remove sensitive data
-        const userResponse = user.toObject();
-        const { password: _, tokenVersion: __, ...sanitizedUserResponse } = userResponse;
+        const { password: _, tokenVersion: __, ...sanitizedUserResponse } = user.toObject();
 
         return ApiResponse.success(
             res,
@@ -114,39 +95,31 @@ export class AuthController {
     public login = asyncHandler(async (req: Request, res: Response) => {
         const { email, password }: Auth = req.body;
 
-        if (!email) {
-            throw new ApiError(400, 'Email is required');
-        }
-        if (!password) {
-            throw new ApiError(400, 'Password is required');
+        if (!email || !password) {
+            throw new ApiError(400, 'Email and password are required');
         }
 
-        // Find user and select password
         const user = await User.findOne({ email }).select('+password');
         if (!user || !user.isActive) {
             throw new ApiError(401, 'Invalid credentials');
         }
 
-        // Verify password
         const isValidPassword = await compare(password, user.password);
         if (!isValidPassword) {
             throw new ApiError(401, 'Invalid credentials');
         }
 
-        // Update last login
         user.lastLoginAt = new Date();
         await user.save();
 
         const { accessToken, refreshToken } = this.createTokens(user);
 
-        // Remove sensitive data
-        const userResponse = user.toObject();
-        const { password: _, tokenVersion: __, ...sanitizedUserResponse } = userResponse;
+        const { password: _, tokenVersion: __, ...sanitizedUserResponse } = user.toObject();
 
         return ApiResponse.success(
             res,
             'Login successful',
-            { 
+            {
                 user: sanitizedUserResponse,
                 accessToken,
                 refreshToken
@@ -155,7 +128,7 @@ export class AuthController {
     });
 
     public refreshToken = asyncHandler(async (req: Request, res: Response) => {
-        const refreshToken = req.body.refreshToken;
+        const { refreshToken } = req.body;
         if (!refreshToken) {
             throw new ApiError(401, 'Refresh token required');
         }
@@ -178,7 +151,6 @@ export class AuthController {
     public logout = asyncHandler(async (req: Request & { user?: { _id: string } }, res: Response) => {
         const userId = req.user?._id;
         if (userId) {
-            // Increment token version to invalidate all existing refresh tokens
             await User.findByIdAndUpdate(userId, { $inc: { tokenVersion: 1 } });
         }
         return ApiResponse.success(res, 'Logged out successfully');
