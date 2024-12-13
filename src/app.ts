@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+
 import swaggerUi from 'swagger-ui-express';
 import v1Routes from './routes/v1';
 import { ApiError } from './utils/ApiError';
@@ -11,6 +11,7 @@ import { ApiResponse } from './utils/ApiResponse';
 import { errorConverter, errorHandler } from './middleware/error';
 import { swaggerSpec } from './config/swagger';
 import basicAuth from 'express-basic-auth';
+import { initializeRedisClient } from './config/redis';
 
 const createApp = (): Express => {
     const app: Express = express();
@@ -26,6 +27,10 @@ const createApp = (): Express => {
     app.use(compression());
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true }));
+
+    // Initialize Redis client
+    initializeRedisClient();
+    
 
     // Rate limiting
     // const limiter = rateLimit({

@@ -8,9 +8,12 @@ const helmet_1 = __importDefault(require("helmet"));
 const cors_1 = __importDefault(require("cors"));
 const compression_1 = __importDefault(require("compression"));
 const morgan_1 = __importDefault(require("morgan"));
+const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const v1_1 = __importDefault(require("./routes/v1"));
 const ApiError_1 = require("./utils/ApiError");
 const error_1 = require("./middleware/error");
+const swagger_1 = require("./config/swagger");
+const express_basic_auth_1 = __importDefault(require("express-basic-auth"));
 const createApp = () => {
     const app = (0, express_1.default)();
     const environment = process.env.NODE_ENV || 'development';
@@ -61,6 +64,25 @@ const createApp = () => {
             documentation: '/api'
         });
     });
+    // Swagger documentation with password protection
+    if (environment === 'development') {
+        app.use('/docs', (0, express_basic_auth_1.default)({
+            users: { 'admin': 'password' },
+            challenge: true,
+        }), swagger_ui_express_1.default.serve);
+        app.get('/docs', swagger_ui_express_1.default.setup(swagger_1.swaggerSpec, {
+            explorer: true,
+            customCss: '.swagger-ui .topbar { display: none }',
+        }));
+        // Endpoint to get swagger.json (also protected)
+        app.get('/swagger.json', (0, express_basic_auth_1.default)({
+            users: { 'admin': 'password' },
+            challenge: true,
+        }), (req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.send(swagger_1.swaggerSpec);
+        });
+    }
     // Handle 404
     app.use((req, res, next) => {
         next(new ApiError_1.ApiError(404, 'Not found'));

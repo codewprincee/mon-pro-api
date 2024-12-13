@@ -5,6 +5,7 @@ var UserRole;
 (function (UserRole) {
     UserRole["ADMIN"] = "admin";
     UserRole["USER"] = "user";
+    UserRole["PREMIUM"] = "premium";
 })(UserRole || (exports.UserRole = UserRole = {}));
 const isValidRole = (role) => {
     return Object.values(UserRole).includes(role);

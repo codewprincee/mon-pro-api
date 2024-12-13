@@ -14,6 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+const http_1 = require("http");
+const redis_1 = __importDefault(require("./config/redis"));
 // Load environment variables based on NODE_ENV
 const environment = process.env.NODE_ENV || 'development';
 dotenv_1.default.config({
@@ -25,10 +27,24 @@ const DbConn_1 = __importDefault(require("./config/DbConn"));
 // Create and configure Express app
 const app = (0, app_1.default)();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+// Create HTTP server
+const server = (0, http_1.createServer)(app);
+// Handle graceful shutdown
+const shutdown = () => {
+    server.close(() => {
+        console.log('HTTP server closed');
+        redis_1.default.quit();
+        process.exit(0);
+    });
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 const startServer = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield (0, DbConn_1.default)();
-        app.listen(port, () => {
+        yield redis_1.default.connect();
+        console.log('Connected to Redis');
+        server.listen(port, () => {
             console.log(`Server running in ${environment} mode on port ${port}`);
             console.log('Environment variables loaded from:', path_1.default.resolve(__dirname, `../.env.${environment}`));
             console.log('JWT Access Secret:', process.env.JWT_ACCESS_SECRET ? 'is set' : 'not set');

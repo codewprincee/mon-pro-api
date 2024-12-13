@@ -35,27 +35,14 @@ class AuthController {
     constructor() {
         this.register = (0, asyncHandler_1.asyncHandler)((req, res) => __awaiter(this, void 0, void 0, function* () {
             const { email, password, firstName, lastName } = req.body;
-            // Check if all required fields are present
-            if (!email) {
-                throw new ApiError_1.ApiError(400, 'Email is required');
+            if (!email || !password || !firstName || !lastName) {
+                throw new ApiError_1.ApiError(400, 'All fields are required');
             }
-            if (!password) {
-                throw new ApiError_1.ApiError(400, 'Password is required');
-            }
-            if (!firstName) {
-                throw new ApiError_1.ApiError(400, 'First name is required');
-            }
-            if (!lastName) {
-                throw new ApiError_1.ApiError(400, 'Last name is required');
-            }
-            // Check if user already exists
             const existingUser = yield User_1.User.findOne({ email });
             if (existingUser) {
                 throw new ApiError_1.ApiError(409, 'Email already registered');
             }
-            // Hash password
             const hashedPassword = yield (0, bcrypt_1.hash)(password, AuthController.SALT_ROUNDS);
-            // Create user with default role
             const user = yield User_1.User.create({
                 email,
                 password: hashedPassword,
@@ -63,39 +50,29 @@ class AuthController {
                 lastName,
                 role: role_interface_1.UserRole.USER,
                 tokenVersion: 0,
-                trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days trial
+                trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
             });
             const { accessToken, refreshToken } = this.createTokens(user);
-            // Remove sensitive data
-            const userResponse = user.toObject();
-            const { password: _, tokenVersion: __ } = userResponse, sanitizedUserResponse = __rest(userResponse, ["password", "tokenVersion"]);
+            const _a = user.toObject(), { password: _, tokenVersion: __ } = _a, sanitizedUserResponse = __rest(_a, ["password", "tokenVersion"]);
             return ApiResponse_1.ApiResponse.success(res, 'Registration successful', { user: sanitizedUserResponse, accessToken, refreshToken }, 201);
         }));
         this.login = (0, asyncHandler_1.asyncHandler)((req, res) => __awaiter(this, void 0, void 0, function* () {
             const { email, password } = req.body;
-            if (!email) {
-                throw new ApiError_1.ApiError(400, 'Email is required');
+            if (!email || !password) {
+                throw new ApiError_1.ApiError(400, 'Email and password are required');
             }
-            if (!password) {
-                throw new ApiError_1.ApiError(400, 'Password is required');
-            }
-            // Find user and select password
             const user = yield User_1.User.findOne({ email }).select('+password');
             if (!user || !user.isActive) {
                 throw new ApiError_1.ApiError(401, 'Invalid credentials');
             }
-            // Verify password
             const isValidPassword = yield (0, bcrypt_1.compare)(password, user.password);
             if (!isValidPassword) {
                 throw new ApiError_1.ApiError(401, 'Invalid credentials');
             }
-            // Update last login
             user.lastLoginAt = new Date();
             yield user.save();
             const { accessToken, refreshToken } = this.createTokens(user);
-            // Remove sensitive data
-            const userResponse = user.toObject();
-            const { password: _, tokenVersion: __ } = userResponse, sanitizedUserResponse = __rest(userResponse, ["password", "tokenVersion"]);
+            const _a = user.toObject(), { password: _, tokenVersion: __ } = _a, sanitizedUserResponse = __rest(_a, ["password", "tokenVersion"]);
             return ApiResponse_1.ApiResponse.success(res, 'Login successful', {
                 user: sanitizedUserResponse,
                 accessToken,
@@ -103,7 +80,7 @@ class AuthController {
             });
         }));
         this.refreshToken = (0, asyncHandler_1.asyncHandler)((req, res) => __awaiter(this, void 0, void 0, function* () {
-            const refreshToken = req.body.refreshToken;
+            const { refreshToken } = req.body;
             if (!refreshToken) {
                 throw new ApiError_1.ApiError(401, 'Refresh token required');
             }
@@ -124,28 +101,24 @@ class AuthController {
             var _a;
             const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
             if (userId) {
-                // Increment token version to invalidate all existing refresh tokens
                 yield User_1.User.findByIdAndUpdate(userId, { $inc: { tokenVersion: 1 } });
             }
             return ApiResponse_1.ApiResponse.success(res, 'Logged out successfully');
         }));
     }
     validateJwtSecrets() {
-        if (!AuthController.ACCESS_TOKEN_SECRET) {
-            throw new ApiError_1.ApiError(500, 'JWT access secret not configured');
-        }
-        if (!AuthController.REFRESH_TOKEN_SECRET) {
-            throw new ApiError_1.ApiError(500, 'JWT refresh secret not configured');
+        if (!AuthController.ACCESS_TOKEN_SECRET || !AuthController.REFRESH_TOKEN_SECRET) {
+            throw new ApiError_1.ApiError(500, 'JWT secrets not configured');
         }
     }
     createTokens(user) {
         this.validateJwtSecrets();
-        console.log("MY Access", AuthController.ACCESS_TOKEN_SECRET);
-        console.log("MY Refresh", AuthController.REFRESH_TOKEN_SECRET);
         const tokenPayload = {
-            _id: user._id.toString(), // Ensure _id is a string
+            _id: user._id.toString(),
             email: user.email,
-            role: user.role || role_interface_1.UserRole.USER
+            role: user.role || role_interface_1.UserRole.USER,
+            planId: user.planId,
+            id: user._id.toString()
         };
         const refreshPayload = Object.assign(Object.assign({}, tokenPayload), { tokenVersion: user.tokenVersion || 0 });
         return {

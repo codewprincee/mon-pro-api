@@ -42,6 +42,8 @@ const auth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () 
                 _id: decoded._id,
                 email: decoded.email,
                 role: decoded.role,
+                planId: decoded._id, // Using _id as planId for now
+                id: decoded._id, // Using _id as id for now
                 iat: decoded.iat,
                 exp: decoded.exp
             };
